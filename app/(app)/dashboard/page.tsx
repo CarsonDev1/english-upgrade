@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, BookOpen, BrainCircuit, ArrowRight, Layers, Volume2 } from "lucide-react";
+import { Sparkles, BookOpen, BrainCircuit, ArrowRight, Volume2, Flame } from "lucide-react";
 import { IPA_LEVELS } from "@/lib/ipa-data";
+import { computeStreak } from "@/lib/streak";
 import { cn } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -15,20 +16,28 @@ export default async function DashboardPage() {
 
   const nowIso = new Date().toISOString();
 
+  // Pull just enough recent log dates to compute streaks up to ~6 months back.
+  const streakWindowIso = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
+
   const [
     { count: total },
     { count: due },
     { data: recent },
     { data: profile },
     { data: ipaProgress },
-    { count: deckCount },
+    { data: recentLogs },
   ] = await Promise.all([
     supabase.from("vocabulary").select("*", { count: "exact", head: true }).eq("user_id", user.id),
     supabase.from("vocabulary").select("*", { count: "exact", head: true }).eq("user_id", user.id).lte("next_review_at", nowIso),
     supabase.from("vocabulary").select("id, word, ipa_uk, meaning_vi, word_class, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(6),
     supabase.from("profiles").select("display_name").eq("id", user.id).single(),
     supabase.from("ipa_progress").select("lesson_id").eq("user_id", user.id),
-    supabase.from("decks").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase
+      .from("review_logs")
+      .select("reviewed_at")
+      .eq("user_id", user.id)
+      .gte("reviewed_at", streakWindowIso)
+      .order("reviewed_at", { ascending: false }),
   ]);
 
   const masteredLessons = new Set((ipaProgress || []).map((r) => r.lesson_id));
@@ -38,6 +47,7 @@ export default async function DashboardPage() {
     0,
   );
   const masteryPct = totalLessons > 0 ? (masteredCount / totalLessons) * 100 : 0;
+  const streak = computeStreak((recentLogs || []).map((r) => r.reviewed_at));
   const greeting = getGreeting();
 
   return (
@@ -54,10 +64,12 @@ export default async function DashboardPage() {
       {/* Stats */}
       <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4">
         <Stat
-          label="Total words"
-          value={total ?? 0}
-          icon={<BookOpen className="h-5 w-5" />}
-          tint="sky"
+          label="Streak"
+          value={streak === 0 ? "0" : `${streak}🔥`}
+          sublabel={streakSublabel(streak)}
+          icon={<Flame className="h-5 w-5" />}
+          tint={streak > 0 ? "amber" : "muted"}
+          highlight={streak >= 3}
         />
         <Stat
           label="Due for review"
@@ -67,10 +79,10 @@ export default async function DashboardPage() {
           highlight={(due ?? 0) > 0}
         />
         <Stat
-          label="Decks"
-          value={deckCount ?? 0}
-          icon={<Layers className="h-5 w-5" />}
-          tint="emerald"
+          label="Total words"
+          value={total ?? 0}
+          icon={<BookOpen className="h-5 w-5" />}
+          tint="sky"
         />
         <Stat
           label="IPA mastered"
@@ -212,18 +224,29 @@ const TINTS: Record<string, { bg: string; fg: string; ring: string }> = {
   sky: { bg: "bg-sky-500/10", fg: "text-sky-600 dark:text-sky-400", ring: "ring-sky-500/20" },
   cyan: { bg: "bg-cyan-500/10", fg: "text-cyan-600 dark:text-cyan-400", ring: "ring-cyan-500/20" },
   emerald: { bg: "bg-emerald-500/10", fg: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-500/20" },
+  amber: { bg: "bg-amber-500/10", fg: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500/20" },
   muted: { bg: "bg-muted", fg: "text-muted-foreground", ring: "ring-border" },
 };
+
+function streakSublabel(n: number): string | undefined {
+  if (n === 0) return "Bắt đầu hôm nay";
+  if (n === 1) return "Ngày đầu tiên";
+  if (n < 7) return `${n} ngày liên tiếp`;
+  if (n < 30) return "Đỉnh quá!";
+  return "Huyền thoại 🏆";
+}
 
 function Stat({
   label,
   value,
+  sublabel,
   icon,
   tint,
   highlight = false,
 }: {
   label: string;
   value: number | string;
+  sublabel?: string;
   icon: React.ReactNode;
   tint: keyof typeof TINTS;
   highlight?: boolean;
@@ -240,6 +263,9 @@ function Stat({
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-muted-foreground">{label}</p>
           <p className="text-2xl md:text-3xl font-bold mt-1.5 leading-none tabular-nums">{value}</p>
+          {sublabel && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 truncate">{sublabel}</p>
+          )}
         </div>
         <div className={cn("p-2.5 rounded-xl shrink-0 ring-1 ring-inset", t.bg, t.fg, t.ring)}>{icon}</div>
       </CardContent>

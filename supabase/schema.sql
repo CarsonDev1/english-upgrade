@@ -74,6 +74,7 @@ create table if not exists public.vocabulary (
   meaning_vi text,
   definition_en text,
   notes text,
+  image_url text,
   ai_generated boolean not null default false,
   ease_factor float not null default 2.5,
   interval_days int not null default 0,
@@ -82,6 +83,9 @@ create table if not exists public.vocabulary (
   last_reviewed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Backfill column for existing installs
+alter table public.vocabulary add column if not exists image_url text;
 
 create index if not exists vocab_user_id_idx on public.vocabulary(user_id);
 create index if not exists vocab_deck_id_idx on public.vocabulary(deck_id);

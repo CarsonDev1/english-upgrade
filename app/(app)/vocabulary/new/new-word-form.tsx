@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Loader2, Plus, X, MessageSquare } from "lucide-react";
+import { Sparkles, Loader2, Plus, X, MessageSquare, ImageIcon, RefreshCw, Trash2 } from "lucide-react";
 import { saveWord } from "../actions";
 import type { GeneratedWord } from "@/lib/groq";
 import { toast } from "sonner";
@@ -33,9 +33,37 @@ export function NewWordForm({ decks }: { decks: { id: string; name: string }[] }
   const [deckId, setDeckId] = useState<string>("none");
   const [examples, setExamples] = useState<ExampleField[]>([]);
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [imageLoading, setImageLoading] = useState(false);
+  // Track how many times we've auto-retried the current image to avoid loops.
+  const imageRetryRef = useRef(0);
+  // Last context used to fetch an image — needed for auto-retry on <img> error.
+  const lastImageCtxRef = useRef<{
+    word: string;
+    meaning_vi?: string;
+    definition_en?: string;
+    word_class?: string;
+  } | null>(null);
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  async function fetchImage(payload: {
+    word: string;
+    meaning_vi?: string;
+    definition_en?: string;
+    word_class?: string;
+    regenerate?: boolean;
+  }): Promise<string | null> {
+    const res = await fetch("/api/ai/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Image gen failed");
+    return data.url || null;
+  }
 
   async function generate() {
     if (!word.trim()) {
@@ -43,14 +71,17 @@ export function NewWordForm({ decks }: { decks: { id: string; name: string }[] }
       return;
     }
     setGenerating(true);
+    setImageLoading(true);
+    setImageUrl("");
+    imageRetryRef.current = 0;
     try {
-      const res = await fetch("/api/ai/generate-word", {
+      const wordRes = await fetch("/api/ai/generate-word", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ word: word.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "AI failed");
+      const data = await wordRes.json();
+      if (!wordRes.ok) throw new Error(data?.error || "AI failed");
       const g: GeneratedWord = data;
       setWord(g.word || word);
       setIpaUk(g.ipa_uk || "");
@@ -67,10 +98,74 @@ export function NewWordForm({ decks }: { decks: { id: string; name: string }[] }
       );
       setAiGenerated(true);
       toast.success("AI đã sinh thành công!");
+
+      // Image gen runs after we have semantic context so the prompt is richer.
+      // Loading state stays on until the <img> actually loads (onLoad).
+      try {
+        const ctx = {
+          word: g.word || word,
+          meaning_vi: g.meaning_vi,
+          definition_en: g.definition_en,
+          word_class: g.word_class,
+        };
+        lastImageCtxRef.current = ctx;
+        const url = await fetchImage(ctx);
+        if (url) setImageUrl(url);
+        else setImageLoading(false);
+      } catch (imgErr: any) {
+        setImageLoading(false);
+        toast.error(imgErr.message || "Tạo ảnh thất bại");
+      }
     } catch (err: any) {
+      setImageLoading(false);
       toast.error(err.message || "AI generation failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function regenerateImage() {
+    if (!word.trim()) {
+      toast.error("Nhập từ trước.");
+      return;
+    }
+    setImageLoading(true);
+    setImageUrl("");
+    imageRetryRef.current = 0;
+    try {
+      const ctx = {
+        word: word.trim(),
+        meaning_vi: meaningVi,
+        definition_en: definitionEn,
+        word_class: wordClass,
+      };
+      lastImageCtxRef.current = ctx;
+      const url = await fetchImage({ ...ctx, regenerate: true });
+      if (url) setImageUrl(url);
+      else setImageLoading(false);
+    } catch (err: any) {
+      setImageLoading(false);
+      toast.error(err.message || "Tạo ảnh thất bại");
+    }
+  }
+
+  async function handleImageError() {
+    if (imageRetryRef.current >= 2 || !lastImageCtxRef.current) {
+      setImageLoading(false);
+      setImageUrl("");
+      toast.error("Ảnh tải lỗi. Thử bấm tạo lại nhé.");
+      return;
+    }
+    imageRetryRef.current += 1;
+    setImageLoading(true);
+    try {
+      const url = await fetchImage({ ...lastImageCtxRef.current, regenerate: true });
+      if (url) setImageUrl(url);
+      else setImageLoading(false);
+    } catch {
+      setImageLoading(false);
+      setImageUrl("");
+      toast.error("Ảnh tải lỗi. Thử bấm tạo lại nhé.");
     }
   }
 
@@ -89,6 +184,7 @@ export function NewWordForm({ decks }: { decks: { id: string; name: string }[] }
       meaning_vi: meaningVi || undefined,
       definition_en: definitionEn || undefined,
       notes: notes || undefined,
+      image_url: imageUrl || undefined,
       deck_id: deckId === "none" ? null : deckId,
       ai_generated: aiGenerated,
       examples,
@@ -257,9 +353,91 @@ export function NewWordForm({ decks }: { decks: { id: string; name: string }[] }
           </Card>
         </div>
 
-        {/* Right: examples */}
-        <div className="lg:col-span-2">
-          <Card className="surface-elevated lg:sticky lg:top-6">
+        {/* Right: illustration + examples */}
+        <div className="lg:col-span-2 space-y-5">
+          <Card className="surface-elevated">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base inline-flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                Illustration
+              </CardTitle>
+              {(imageUrl || imageLoading) && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={regenerateImage}
+                    disabled={imageLoading || !word.trim()}
+                    aria-label="Regenerate image"
+                    title="Tạo lại ảnh khác"
+                  >
+                    <RefreshCw className={imageLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                  </Button>
+                  {imageUrl && !imageLoading && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => setImageUrl("")}
+                      aria-label="Remove image"
+                      title="Xoá ảnh"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              {imageUrl ? (
+                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-muted/20 border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl}
+                    alt={word}
+                    className="absolute inset-0 h-full w-full object-contain"
+                    onLoad={() => setImageLoading(false)}
+                    onError={handleImageError}
+                  />
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/70 backdrop-blur-sm">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <p className="text-xs text-muted-foreground">
+                        AI đang vẽ... (có thể mất 20-40s)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : imageLoading ? (
+                <div className="aspect-square w-full rounded-xl border border-dashed flex flex-col items-center justify-center gap-2 text-muted-foreground bg-muted/20">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-xs">Đang tạo ảnh AI...</p>
+                </div>
+              ) : (
+                <div className="aspect-square w-full rounded-xl border border-dashed flex flex-col items-center justify-center gap-2 text-center px-4">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/60" />
+                  <p className="text-xs text-muted-foreground">
+                    Bấm <span className="font-medium text-foreground">AI fill</span> để sinh ảnh minh hoạ.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-1 h-8"
+                    onClick={regenerateImage}
+                    disabled={!word.trim()}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> Chỉ tạo ảnh
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="surface-elevated">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base inline-flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />

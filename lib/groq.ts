@@ -73,3 +73,39 @@ export async function generateWord(input: string): Promise<GeneratedWord> {
   if (!Array.isArray(parsed.examples)) parsed.examples = [];
   return parsed;
 }
+
+const VISUAL_SUBJECT_PROMPT = `You are a visual designer briefing an illustrator.
+Given an English word with its part-of-speech and meaning, describe ONE concrete drawable scene that visually represents the meaning.
+
+Rules:
+- Output ONE short English sentence, under 25 words.
+- Use tangible objects, characters, or actions a 2D illustrator could draw.
+- For verbs: describe a character performing the action with relevant objects.
+- For nouns: describe the object itself in a clear pose.
+- For adjectives: describe an object/scene that obviously exemplifies the quality.
+- For phrases/idioms: depict the literal situation behind the meaning.
+- DO NOT include the word itself, any letters, signs, labels, or written text in the scene.
+- DO NOT use abstract words like "concept", "idea", "essence".
+- Output only the sentence, no quotes, no JSON, no commentary.`;
+
+export async function generateVisualSubject(
+  word: string,
+  wordClass?: string,
+  definition?: string,
+): Promise<string> {
+  const client = getGroq();
+  const completion = await client.chat.completions.create({
+    model: GROQ_MODEL,
+    temperature: 0.6,
+    messages: [
+      { role: "system", content: VISUAL_SUBJECT_PROMPT },
+      {
+        role: "user",
+        content: `Word: ${word}\nPart of speech: ${wordClass || "unknown"}\nMeaning: ${definition || "(unknown)"}`,
+      },
+    ],
+  });
+  const text = completion.choices[0]?.message?.content?.trim() || "";
+  // Strip wrapping quotes if the model added them.
+  return text.replace(/^["'`]+|["'`]+$/g, "").trim();
+}

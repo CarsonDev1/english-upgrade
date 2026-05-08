@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ChevronRight, RotateCcw, CheckCircle2, Sparkles, Keyboard, X } from "lucide-react";
+import { ChevronRight, RotateCcw, CheckCircle2, Sparkles, Keyboard, X, ArrowRightLeft } from "lucide-react";
 import { reviewWord } from "../vocabulary/actions";
 import { intervalLabel } from "@/lib/srs";
 import { toast } from "sonner";
@@ -27,6 +27,15 @@ interface Card {
   examples: { id: string; sentence: string; translation_vi: string | null }[];
 }
 
+type Mode = "forward" | "reverse" | "mixed";
+type Direction = "forward" | "reverse";
+
+const MODE_OPTIONS: { value: Mode; label: string; desc: string }[] = [
+  { value: "forward", label: "EN → VI", desc: "Recognition" },
+  { value: "reverse", label: "VI → EN", desc: "Production" },
+  { value: "mixed", label: "Mixed", desc: "Both ways" },
+];
+
 const RATINGS: { rating: 1 | 2 | 3 | 4; label: string; sublabel: string; tone: string }[] = [
   { rating: 1, label: "Again", sublabel: "<10m", tone: "destructive" },
   { rating: 2, label: "Hard", sublabel: "shorter", tone: "warning" },
@@ -41,9 +50,26 @@ export function ReviewSession({ cards: initialCards }: { cards: Card[] }) {
   const [stats, setStats] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
   const [, start] = useTransition();
   const [submitting, setSubmitting] = useState(false);
+  const [mode, setMode] = useState<Mode>("forward");
 
   const total = cards.length;
   const card = cards[idx];
+
+  // Pre-compute direction for every card so Mixed mode doesn't reshuffle
+  // mid-session. Re-run when mode changes.
+  const directions = useMemo<Direction[]>(() => {
+    return cards.map((c, i) => {
+      if (mode === "forward") return "forward";
+      // Cards without Vietnamese meaning can't be shown in reverse — fall back.
+      if (!c.meaning_vi?.trim()) return "forward";
+      if (mode === "reverse") return "reverse";
+      // Mixed: deterministic alternation seeded by card id so re-renders are stable.
+      const hash = (c.id.charCodeAt(0) + i) % 2;
+      return hash === 0 ? "forward" : "reverse";
+    });
+  }, [cards, mode]);
+
+  const direction: Direction = directions[idx] ?? "forward";
 
   function rate(r: 1 | 2 | 3 | 4) {
     if (submitting || !card) return;
@@ -124,6 +150,8 @@ export function ReviewSession({ cards: initialCards }: { cards: Card[] }) {
 
   const progressPct = (idx / total) * 100;
 
+  const isReverse = direction === "reverse";
+
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-2xl mx-auto space-y-4">
       {/* Top bar */}
@@ -141,28 +169,86 @@ export function ReviewSession({ cards: initialCards }: { cards: Card[] }) {
           </Link>
         </div>
         <Progress value={progressPct} className="h-2" />
+
+        {/* Mode selector */}
+        <div
+          role="radiogroup"
+          aria-label="Review direction"
+          className="flex items-center gap-1 p-1 rounded-lg border bg-muted/30 text-xs w-full"
+        >
+          {MODE_OPTIONS.map((opt) => {
+            const active = mode === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  setMode(opt.value);
+                  setRevealed(false);
+                }}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center gap-0 px-2 py-1.5 rounded-md transition",
+                  active
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span className="font-semibold leading-tight">{opt.label}</span>
+                <span className="text-[10px] opacity-70 leading-none">{opt.desc}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Card */}
       <Card className="surface-elevated min-h-[420px] overflow-hidden">
-        <div className="h-1 bg-primary" />
+        <div className={cn("h-1", isReverse ? "bg-emerald-500" : "bg-primary")} />
         <CardContent className="p-6 md:p-10 flex flex-col items-center text-center">
           <div className="space-y-3 w-full">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{card.word}</h2>
-              <SpeakButton text={card.word} lang="en-US" />
-            </div>
-            {card.word_class && (
-              <Badge variant="secondary" className="font-normal">
-                {card.word_class}
+            {isReverse && (
+              <Badge variant="outline" className="text-[10px] gap-1 mx-auto">
+                <ArrowRightLeft className="h-3 w-3" /> VI → EN · viết / nói lại từ tiếng Anh
               </Badge>
+            )}
+            {isReverse ? (
+              // Reverse: front shows Vietnamese meaning; user must recall the English word.
+              <div className="flex flex-col items-center justify-center gap-2">
+                <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">
+                  Tiếng Việt
+                </p>
+                <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight">
+                  {card.meaning_vi}
+                </h2>
+                {card.word_class && (
+                  <Badge variant="secondary" className="font-normal">
+                    {card.word_class}
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{card.word}</h2>
+                  <SpeakButton text={card.word} lang="en-US" />
+                </div>
+                {card.word_class && (
+                  <Badge variant="secondary" className="font-normal">
+                    {card.word_class}
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
 
           {!revealed ? (
             <div className="mt-12 flex flex-col items-center gap-4">
               <p className="text-sm text-muted-foreground">
-                Hãy nhớ lại nghĩa của từ. Sau đó bấm để xem đáp án.
+                {isReverse
+                  ? "Hãy nhớ lại từ tiếng Anh tương ứng. Sau đó bấm để xem đáp án."
+                  : "Hãy nhớ lại nghĩa của từ. Sau đó bấm để xem đáp án."}
               </p>
               <Button size="lg" onClick={() => setRevealed(true)}>
                 Show answer <ChevronRight />
@@ -173,6 +259,12 @@ export function ReviewSession({ cards: initialCards }: { cards: Card[] }) {
             </div>
           ) : (
             <div className="mt-6 w-full space-y-4 text-left animate-fade-in-up">
+              {isReverse && (
+                <div className="flex items-center justify-center gap-2 flex-wrap pb-1">
+                  <h3 className="text-3xl md:text-4xl font-bold tracking-tight">{card.word}</h3>
+                  <SpeakButton text={card.word} lang="en-US" />
+                </div>
+              )}
               {(card.ipa_uk || card.ipa_us) && (
                 <div className="flex items-center gap-2 justify-center flex-wrap">
                   {card.ipa_uk && (
@@ -190,7 +282,7 @@ export function ReviewSession({ cards: initialCards }: { cards: Card[] }) {
                   )}
                 </div>
               )}
-              {card.meaning_vi && (
+              {!isReverse && card.meaning_vi && (
                 <DefBlock label="Tiếng Việt" body={card.meaning_vi} />
               )}
               {card.definition_en && (

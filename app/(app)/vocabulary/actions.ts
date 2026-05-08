@@ -12,6 +12,7 @@ export interface SaveWordInput {
   meaning_vi?: string;
   definition_en?: string;
   notes?: string;
+  image_url?: string;
   deck_id?: string | null;
   ai_generated?: boolean;
   examples?: { sentence: string; translation_vi?: string; ai_generated?: boolean }[];
@@ -37,6 +38,7 @@ export async function saveWord(input: SaveWordInput) {
       meaning_vi: input.meaning_vi || null,
       definition_en: input.definition_en || null,
       notes: input.notes || null,
+      image_url: input.image_url || null,
       ai_generated: input.ai_generated ?? false,
     })
     .select()
@@ -78,6 +80,7 @@ export async function updateWord(id: string, input: Partial<SaveWordInput>) {
       meaning_vi: input.meaning_vi,
       definition_en: input.definition_en,
       notes: input.notes,
+      image_url: input.image_url,
       deck_id: input.deck_id,
     })
     .eq("id", id)

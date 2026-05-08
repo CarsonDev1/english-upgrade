@@ -76,6 +76,17 @@ export default async function VocabDetailPage({ params }: { params: Promise<{ id
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
+          {word.image_url && (
+            <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={word.image_url}
+                alt={word.word}
+                loading="lazy"
+                className="w-full max-w-xs aspect-square rounded-2xl object-contain bg-muted/30 border"
+              />
+            </div>
+          )}
           {word.meaning_vi && <DefinitionBlock label="Tiếng Việt" body={word.meaning_vi} />}
           {word.definition_en && <DefinitionBlock label="English" body={word.definition_en} />}
           {word.notes && <DefinitionBlock label="Ghi chú" body={word.notes} mono />}

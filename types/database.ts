@@ -63,6 +63,7 @@ export type Database = {
           meaning_vi: string | null;
           definition_en: string | null;
           notes: string | null;
+          image_url: string | null;
           ai_generated: boolean;
           ease_factor: number;
           interval_days: number;
@@ -82,6 +83,7 @@ export type Database = {
           meaning_vi?: string | null;
           definition_en?: string | null;
           notes?: string | null;
+          image_url?: string | null;
           ai_generated?: boolean;
           ease_factor?: number;
           interval_days?: number;
@@ -101,6 +103,7 @@ export type Database = {
           meaning_vi?: string | null;
           definition_en?: string | null;
           notes?: string | null;
+          image_url?: string | null;
           ai_generated?: boolean;
           ease_factor?: number;
           interval_days?: number;
