@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Layers } from "lucide-react";
 import { DecksManager } from "./decks-manager";
+import { PageContainer, PageHeader } from "@/components/page-header";
 
 export default async function DecksPage() {
   const supabase = await createClient();
@@ -15,7 +13,6 @@ export default async function DecksPage() {
     .eq("user_id", user.id)
     .order("created_at");
 
-  // Count words per deck
   const { data: counts } = await supabase
     .from("vocabulary")
     .select("deck_id")
@@ -27,13 +24,12 @@ export default async function DecksPage() {
   });
 
   return (
-    <div className="container max-w-5xl py-6 md:py-10 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Decks</h1>
-        <p className="text-muted-foreground mt-1">Group your vocabulary by topic.</p>
-      </div>
-
+    <PageContainer size="lg">
+      <PageHeader
+        title="Decks"
+        description="Nhóm từ vựng theo chủ đề để học tập trung hơn."
+      />
       <DecksManager decks={(decks || []).map((d) => ({ ...d, word_count: wordCount[d.id] || 0 }))} />
-    </div>
+    </PageContainer>
   );
 }

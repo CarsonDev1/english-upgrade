@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NewWordForm } from "./new-word-form";
+import { PageContainer, PageHeader } from "@/components/page-header";
 
 export default async function NewWordPage() {
   const supabase = await createClient();
@@ -13,14 +14,18 @@ export default async function NewWordPage() {
     .order("created_at");
 
   return (
-    <div className="container max-w-5xl py-6 md:py-8">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold tracking-tight">Add a new word</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Type a word, click <span className="font-medium text-foreground">AI fill</span> to auto-generate IPA, meaning, and examples.
-        </p>
-      </div>
+    <PageContainer size="lg">
+      <PageHeader
+        title="Add a new word"
+        backHref="/vocabulary"
+        backLabel="Back to vocabulary"
+        description={
+          <>
+            Nhập từ rồi bấm <span className="font-medium text-foreground">AI fill</span> để tự sinh IPA, nghĩa và ví dụ.
+          </>
+        }
+      />
       <NewWordForm decks={decks || []} />
-    </div>
+    </PageContainer>
   );
 }

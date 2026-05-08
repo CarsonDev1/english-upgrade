@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, BookOpen } from "lucide-react";
+import { Sparkles, BookOpen, PartyPopper } from "lucide-react";
 import { ReviewSession } from "./review-session";
 
 export default async function ReviewPage() {
@@ -28,19 +28,29 @@ export default async function ReviewPage() {
 
   if (cards.length === 0) {
     return (
-      <div className="container max-w-2xl py-10">
-        <Card>
-          <CardContent className="py-16 text-center space-y-4">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Sparkles className="h-6 w-6" />
+      <div className="px-4 md:px-8 py-10 max-w-2xl mx-auto">
+        <Card className="surface-elevated">
+          <CardContent className="py-16 text-center space-y-5">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+              <PartyPopper className="h-7 w-7" />
             </div>
             <div>
-              <p className="text-xl font-semibold">All caught up!</p>
-              <p className="text-sm text-muted-foreground mt-1">No words are due for review right now.</p>
+              <p className="text-2xl font-bold tracking-tight">All caught up!</p>
+              <p className="text-muted-foreground mt-1">
+                Không có từ nào cần ôn ngay bây giờ. Quay lại sau.
+              </p>
             </div>
-            <div className="flex gap-2 justify-center">
-              <Button asChild><Link href="/vocabulary/new">Add new word</Link></Button>
-              <Button asChild variant="outline"><Link href="/vocabulary"><BookOpen className="mr-1" /> Browse vocabulary</Link></Button>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+              <Button asChild>
+                <Link href="/vocabulary/new">
+                  <Sparkles /> Add new word
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/vocabulary">
+                  <BookOpen /> Browse vocabulary
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

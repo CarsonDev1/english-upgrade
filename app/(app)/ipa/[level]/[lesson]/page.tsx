@@ -5,9 +5,10 @@ import { getLesson, IPA_LEVELS } from "@/lib/ipa-data";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, CheckCircle2, Volume2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Lightbulb } from "lucide-react";
 import { SpeakButton } from "@/components/speak-button";
 import { LessonQuiz } from "./lesson-quiz";
+import { PageContainer } from "@/components/page-header";
 
 export default async function LessonPage({
   params,
@@ -32,48 +33,70 @@ export default async function LessonPage({
     .maybeSingle();
   const isMastered = !!progressRow;
 
-  // Find next/prev lesson
   const levelData = IPA_LEVELS.find((l) => l.level === levelNum)!;
   const idx = levelData.lessons.findIndex((l) => l.id === lessonId);
   const prev = idx > 0 ? levelData.lessons[idx - 1] : null;
   const next = idx < levelData.lessons.length - 1 ? levelData.lessons[idx + 1] : null;
 
   return (
-    <div className="container max-w-3xl py-6 md:py-10 space-y-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/ipa"><ArrowLeft className="h-4 w-4 mr-1" /> Back to roadmap</Link>
+    <PageContainer size="default">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground hover:text-foreground">
+        <Link href="/ipa">
+          <ArrowLeft className="h-4 w-4" /> Back to roadmap
+        </Link>
       </Button>
 
-      <div>
-        <Badge variant="outline" className="mb-2">Level {levelNum} · {levelData.title}</Badge>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3 flex-wrap">
-          <span className="ipa text-5xl text-primary">/{lesson.symbol}/</span>
-          <span>{lesson.title}</span>
-          {isMastered && <CheckCircle2 className="h-6 w-6 text-primary" />}
-        </h1>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mô tả</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p>{lesson.description}</p>
-          <div className="rounded-md bg-primary/5 border border-primary/20 p-3">
-            <p className="text-xs uppercase font-medium text-primary mb-1">Mẹo phát âm</p>
-            <p className="text-sm">{lesson.mouthTip}</p>
+      {/* Hero */}
+      <Card className="surface-elevated overflow-hidden">
+        <div className="h-1 bg-primary" />
+        <CardContent className="p-6 md:p-8 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline">
+              Level {levelNum} · {levelData.title}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Lesson {idx + 1}/{levelData.lessons.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="ipa text-5xl md:text-7xl font-bold text-primary">/{lesson.symbol}/</span>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+              {lesson.title}
+              {isMastered && <CheckCircle2 className="h-6 w-6 text-primary" />}
+            </h1>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Description + tip */}
+      <Card className="surface-elevated">
+        <CardHeader>
+          <CardTitle className="text-base">Mô tả</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="leading-relaxed">{lesson.description}</p>
+          <div className="rounded-xl bg-accent/40 border border-primary/20 p-4 flex gap-3">
+            <Lightbulb className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[10px] uppercase font-semibold tracking-wider text-primary">Mẹo phát âm</p>
+              <p className="text-sm mt-0.5 leading-relaxed">{lesson.mouthTip}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Examples */}
+      <Card className="surface-elevated">
         <CardHeader>
           <CardTitle className="text-base">Ví dụ</CardTitle>
           <CardDescription>Bấm 🔊 để nghe rồi lặp lại theo (shadowing).</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 md:grid-cols-2">
+        <CardContent className="grid gap-2 sm:grid-cols-2">
           {lesson.examples.map((ex) => (
-            <div key={ex.word} className="flex items-center justify-between rounded-md border p-3">
+            <div
+              key={ex.word}
+              className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-3 transition hover:border-primary/30"
+            >
               <div className="min-w-0">
                 <p className="font-semibold">{ex.word}</p>
                 <p className="ipa text-sm text-primary">{ex.ipa}</p>
@@ -85,8 +108,9 @@ export default async function LessonPage({
         </CardContent>
       </Card>
 
+      {/* Minimal pairs */}
       {lesson.minimalPairs && lesson.minimalPairs.length > 0 && (
-        <Card>
+        <Card className="surface-elevated">
           <CardHeader>
             <CardTitle className="text-base">Minimal pairs</CardTitle>
             <CardDescription>So sánh để phân biệt — bấm 🔊 cả 2 và nghe sự khác biệt.</CardDescription>
@@ -94,14 +118,14 @@ export default async function LessonPage({
           <CardContent className="space-y-2">
             {lesson.minimalPairs.map((mp, i) => (
               <div key={i} className="grid grid-cols-2 gap-3">
-                <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center justify-between rounded-xl border bg-primary/5 p-3">
                   <div>
                     <p className="font-semibold">{mp.a.word}</p>
                     <p className="ipa text-sm text-primary">{mp.a.ipa}</p>
                   </div>
                   <SpeakButton text={mp.a.word} />
                 </div>
-                <div className="flex items-center justify-between rounded-md border p-3 border-dashed">
+                <div className="flex items-center justify-between rounded-xl border-2 border-dashed bg-card p-3">
                   <div>
                     <p className="font-semibold">{mp.b.word}</p>
                     <p className="ipa text-sm">{mp.b.ipa}</p>
@@ -114,40 +138,42 @@ export default async function LessonPage({
         </Card>
       )}
 
-      <Card>
+      {/* Quiz */}
+      <Card className="surface-elevated">
         <CardHeader>
           <CardTitle className="text-base">Quiz — 5 câu</CardTitle>
           <CardDescription>Đạt 4/5 trở lên để mark "mastered".</CardDescription>
         </CardHeader>
         <CardContent>
-          <LessonQuiz
-            lessonId={lesson.id}
-            questions={lesson.quiz}
-            alreadyMastered={isMastered}
-          />
+          <LessonQuiz lessonId={lesson.id} questions={lesson.quiz} alreadyMastered={isMastered} />
         </CardContent>
       </Card>
 
-      <div className="flex justify-between gap-2">
+      {/* Footer nav */}
+      <div className="flex justify-between gap-2 pt-2">
         {prev ? (
           <Button asChild variant="outline">
             <Link href={`/ipa/${levelNum}/${encodeURIComponent(prev.id)}`}>
-              <ArrowLeft className="mr-1" /> {prev.title}
+              <ArrowLeft /> {prev.title}
             </Link>
           </Button>
-        ) : <div />}
+        ) : (
+          <div />
+        )}
         {next ? (
           <Button asChild>
             <Link href={`/ipa/${levelNum}/${encodeURIComponent(next.id)}`}>
-              {next.title} <ArrowRight className="ml-1" />
+              {next.title} <ArrowRight />
             </Link>
           </Button>
         ) : (
           <Button asChild>
-            <Link href="/ipa">Done with this level <CheckCircle2 className="ml-1" /></Link>
+            <Link href="/ipa">
+              Done with this level <CheckCircle2 />
+            </Link>
           </Button>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
